@@ -1,0 +1,18 @@
+# 换行符统一为 LF。
+#
+# 这个仓库每天会被 Linux 上的 CI 改写一次（同步快照 → 重新生成形象 → 提交）。
+# 如果没有这一行，Windows 上 core.autocrlf 会在检出时把每个文本文件都换成 CRLF，
+# 下一次 CI 提交时 Git 又认为整仓都变了 —— 每天一条几十兆的假 diff，
+# 真实的变更（哪个模型上线了、哪个价格调了）就被淹掉了。
+* text=auto eol=lf
+
+# 明确按二进制处理，不参与换行符转换与 diff
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.zip  binary

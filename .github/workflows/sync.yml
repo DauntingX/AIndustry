@@ -1,0 +1,160 @@
+# 每天自动同步三个上游 → 重新生成整站 → 发布。
+#
+# 这个工作流就是「上线后不需要任何人维护」的全部实现。它做四件事：
+#   1. 抓 Epoch AI（综合智力与逐榜）、models.dev（规格与价格）、LiveBench（分维度能力）
+#   2. 过一遍合理性闸门后，把合并好的快照提交回仓库
+#   3. 由快照重新合成形象、渲染全部页面
+#   4. 发布到 GitHub Pages
+#
+# 设计上的两个关键选择：
+#   - **同步失败不影响发布。** 上游挂掉时网站必须照常在线，显示上一次的好数据。
+#     所以同步与形象这两步是 continue-on-error，失败只开 issue 留痕，不阻断 deploy。
+#   - **闸门拒绝写入时同样不阻断。** 快照没更新，页面就用旧的，用户看到的还是对的。
+
+name: 每日同步与发布
+
+on:
+  schedule:
+    # UTC 20:10 = 北京时间 04:10。刻意错开参考项目（01:40 / 13:40 UTC）的抓取时刻，
+    # 避免和别人同时压在同一个上游上。
+    - cron: '10 20 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    # 改了渲染逻辑就立刻重新发布，不必等到第二天
+    paths:
+      - 'src/**'
+      - 'scripts/build.ts'
+      - 'scripts/serve.mjs'
+      - '.github/workflows/sync.yml'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+# 同步之间不并发：两次提交回写同一个分支会互相打翻。
+# 但也不取消进行中的那次——它可能正处在「已经写完文件、还没提交」的中间态。
+concurrency:
+  group: daily-sync
+  cancel-in-progress: false
+
+env:
+  # 这两个是可选的。不配也能跑：
+  #   SITE_URL  配了才生成 sitemap.xml 与 robots.txt（需要含子路径，例如
+  #             https://user.github.io/repo ）
+  #   BASE_PATH 只有 404 页用得到。用户主页/自定义域名不用配（默认 /）；
+  #             GitHub Pages *项目页* 需要配成 /仓库名/
+  SITE_URL: ${{ vars.SITE_URL }}
+  BASE_PATH: ${{ vars.BASE_PATH }}
+
+jobs:
+  build:
+    name: 同步 · 构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 项目是零依赖的，所以没有 install 这一步——
+      # 没有 lockfile 漂移，也没有供应链风险面。
+      - name: 抓取并合并三个上游
+        id: sync
+        continue-on-error: true
+        run: npm run sync
+
+      - name: 由快照合成 Q 版形象
+        id: avatars
+        continue-on-error: true
+        run: npm run avatars
+
+      - name: 渲染静态站点
+        run: npm run build
+
+      # 无人值守的站点，「构建成功」不等于「发布安全」：
+      # 一个上游新模型的名字里混进奇怪的字符，就能让几百个页面里的链接悄悄指空。
+      # 这一步把它拦在发布之前，失败直接红掉。
+      - name: 产物体检（死链 / 渲染残留 / 形象 / 搜索索引）
+        run: npm run verify
+
+      - name: 把本次同步摘要写进运行日志
+        if: always()
+        run: |
+          {
+            echo "## 本次同步"
+            echo ""
+            echo "| 步骤 | 结果 |"
+            echo "| --- | --- |"
+            echo "| 抓取上游 | ${{ steps.sync.outcome }} |"
+            echo "| 合成形象 | ${{ steps.avatars.outcome }} |"
+            echo ""
+            if [ -f data/sync-report.json ]; then
+              echo '```json'
+              cat data/sync-report.json
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 只有同步真的成功才回写。闸门拒绝写入时 data/ 没变，
+      # 这个 commit 自然就是空的，会被 git diff --cached --quiet 挡掉。
+      - name: 提交快照与形象变更
+        if: steps.sync.outcome == 'success'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/snapshot.json data/sync-report.json public/avatars/
+          if git diff --cached --quiet; then
+            echo "上游没有变化，无需提交。"
+          else
+            git commit -m "chore(data): 每日同步 $(date -u '+%Y-%m-%d')"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+        if: github.ref == 'refs/heads/main'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      # 失败就开一条 issue。同名的 issue 只会存在一条，后续失败追加评论，
+      # 避免邮箱被每天一条的告警刷屏。
+      - name: 同步失败时开 issue
+        if: steps.sync.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="上游同步失败 $(date -u '+%Y-%m-%d')"
+          BODY=$(printf '%s\n' \
+            "自动同步没有通过合理性闸门，已保留上一版快照，**网站未受影响**。" "" \
+            "运行日志：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" "" \
+            "常见原因：上游改了字段名、改了下载地址，或临时限流。" "" \
+            "注意这通常**不是**报错型失败——真正的失效模式是解析器一条都没接到、" \
+            "覆盖率静默掉到 0，页面照常渲染但所有排名都错了。请检查 data/sync-report.json 里的覆盖率。")
+          # 标签要先确保存在。`gh issue create --label` 在标签不存在时会直接报错，
+          # 而这一步本身就是失败处理路径——它再挂，人就真的收不到任何信号了。
+          gh label create "data-sync" --color "d73a4a" --description "上游数据同步相关" --force >/dev/null 2>&1 || true
+          EXISTING=$(gh issue list --label "data-sync" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            # 连建标签都失败时，退回不带标签的 issue——宁可少个标签，也不能无声失败。
+            gh issue create --title "$TITLE" --body "$BODY" --label "data-sync" \
+              || gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+  deploy:
+    name: 发布
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

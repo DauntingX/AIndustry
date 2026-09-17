@@ -1,0 +1,16 @@
+# 依赖（本项目零依赖，这里只防手滑）
+node_modules/
+package-lock.json
+
+# 构建产物：由 `npm run build` 生成，不进仓库
+dist/
+
+# 同步管线的条件请求缓存。是纯本地的加速层，
+# 提交它只会让 CI 分不清「上游真的变了」和「缓存说你没变」。
+data/.cache/
+
+# 本地临时文件
+.scratch/
+*.log
+.DS_Store
+Thumbs.db

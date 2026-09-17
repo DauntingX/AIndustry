@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
+    // 关键约束：只允许「可以擦除」的 TS 语法。
+    // 运行时是 `node --experimental-strip-types`，它只删类型、不做编译——
+    // enum、namespace、构造函数参数属性这些都会在运行时直接报错。
+    // 打开这一项，编辑器会在写下去的瞬间就拦住，而不是等到 CI 才炸。
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+}

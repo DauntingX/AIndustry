@@ -1,0 +1,22 @@
+{
+  "name": "ai-model-compare",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "大模型对比台 — 评分、价格、发展路线与关键文章，全站由公开数据自动生成",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "sync": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/sync/index.ts",
+    "avatars": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/avatars/index.ts",
+    "build": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/build.ts",
+    "verify": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/verify.ts",
+    "serve": "node scripts/serve.mjs dist 3100",
+    "start": "npm run serve",
+    "pipeline": "npm run sync && npm run avatars && npm run build && npm run verify"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
