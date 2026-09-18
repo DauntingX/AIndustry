@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-17T15:54:53.031Z",
+  "generatedAt": "2026-09-18T02:13:03.938Z",
   "accepted": true,
-  "durationMs": 13162,
+  "durationMs": 755,
   "counts": {
     "models": 425,
-    "withEci": 206,
+    "withEci": 205,
     "withLivebench": 43,
     "withPrice": 297,
     "offers": 3880,
@@ -14,21 +14,21 @@
   "sources": {
     "models.dev": {
       "ok": true,
-      "fetchedAt": "2026-09-17T15:54:53.031Z",
-      "notModified": true,
+      "fetchedAt": "2026-09-18T02:13:03.938Z",
+      "notModified": false,
       "note": "323 款模型"
     },
     "epoch.ai": {
       "ok": true,
-      "fetchedAt": "2026-09-17T15:54:53.031Z",
-      "notModified": true,
-      "note": "572 条记录 · 59 个榜单 · 缓存上限 90s"
+      "fetchedAt": "2026-09-18T02:13:03.938Z",
+      "notModified": false,
+      "note": "573 条记录 · 59 个榜单 · 缓存上限 90s"
     },
     "livebench": {
       "ok": true,
-      "fetchedAt": "2026-09-17T15:54:53.031Z",
-      "notModified": true,
-      "note": "58 款模型 · 23 项任务 · 7 个能力大类 · release 清单走了内置兜底"
+      "fetchedAt": "2026-09-18T02:13:03.938Z",
+      "notModified": false,
+      "note": "58 款模型 · 23 项任务 · 7 个能力大类"
     }
   },
   "livebenchRelease": "2026-06-25",
